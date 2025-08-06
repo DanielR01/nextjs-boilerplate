@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * This API route is designed to handle webhooks from various sources,
- * including Mailgun. It can intelligently parse both 'application/json'
- * and 'multipart/form-data' content types.
+ * including Mailgun. It can intelligently parse 'application/json',
+ * 'multipart/form-data', and 'text/plain' content types.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +27,13 @@ export async function POST(request: NextRequest) {
       sender = formData.get('sender') as string | null;
       subject = formData.get('subject') as string | null;
       body = formData.get('body-plain') as string | null;
+    } else if (contentType.includes('text/plain')) {
+      console.log("Parsing request as plain text...");
+      body = await request.text();
+      // For plain text, sender and subject aren't available in the same way.
+      // We'll set default values to satisfy the logic.
+      sender = "Unknown (Plain Text)";
+      subject = "No Subject (Plain Text)";
     } else {
       // Handle unsupported content types
       console.error(`Unsupported Content-Type: ${contentType}`);
