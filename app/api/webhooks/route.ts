@@ -2,32 +2,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * This API route is designed to handle webhooks from Mailgun.
- * Mailgun sends data in the 'multipart/form-data' format, not JSON.
- * Therefore, we can't use `request.json()`. Instead, we use `request.formData()`
- * to correctly parse the incoming data.
+ * This API route is designed to handle webhooks from various sources,
+ * including Mailgun. It can intelligently parse both 'application/json'
+ * and 'multipart/form-data' content types.
  */
 export async function POST(request: NextRequest) {
   try {
-    // Use request.formData() to parse the multipart/form-data payload
-    const formData = await request.formData();
+    const contentType = request.headers.get('content-type') || '';
+    let sender: string | null = null;
+    let subject: string | null = null;
+    let body: string | null = null;
 
-    // The data from Mailgun is now available in the formData object.
-    // We can access each field using the .get() method.
-    // The field names (e.g., 'sender', 'subject') are defined by Mailgun.
-    const sender = formData.get('sender') as string | null;
-    const subject = formData.get('subject') as string | null;
-    const body = formData.get('body-plain') as string | null; // 'body-plain' is the text version
+    // Check the content type to decide how to parse the body
+    if (contentType.includes('application/json')) {
+      console.log("Parsing request as JSON...");
+      const json = await request.json();
+      sender = json.sender;
+      subject = json.subject;
+      // Handle both 'body' and 'body-plain' for flexibility
+      body = json.body || json['body-plain'];
+    } else if (contentType.includes('multipart/form-data')) {
+      console.log("Parsing request as multipart/form-data...");
+      const formData = await request.formData();
+      sender = formData.get('sender') as string | null;
+      subject = formData.get('subject') as string | null;
+      body = formData.get('body-plain') as string | null;
+    } else {
+      // Handle unsupported content types
+      console.error(`Unsupported Content-Type: ${contentType}`);
+      return NextResponse.json({ message: `Unsupported Content-Type` }, { status: 415 });
+    }
 
     // Log the parsed data to the Vercel console for debugging
-    console.log("--- Mailgun Webhook Payload Received (Parsed as Form Data) ---");
+    console.log("--- Webhook Payload Received ---");
     console.log(`From: ${sender}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${body}`);
-    console.log("----------------------------------------------------------");
+    console.log("--------------------------------");
 
     if (!sender || !subject || !body) {
-      console.error("Webhook payload was missing required fields.");
+      console.error("Webhook payload was missing required fields after parsing.");
       return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
     }
 
@@ -36,12 +50,12 @@ export async function POST(request: NextRequest) {
     // query your database, and send the confirmation email.
 
 
-    // Respond to Mailgun with a success message
+    // Respond with a success message
     return NextResponse.json({ message: "Webhook processed successfully" }, { status: 200 });
 
   } catch (error) {
-    console.error("Error processing form data webhook:", error);
-    // This will catch any errors during the formData parsing
+    console.error("Error processing webhook:", error);
+    // This will catch any errors during parsing
     return NextResponse.json({ message: "Error processing request" }, { status: 500 });
   }
 }
