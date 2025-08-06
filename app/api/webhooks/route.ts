@@ -5,7 +5,26 @@ import { NextRequest, NextResponse } from 'next/server';
  * This API route is designed to handle webhooks from various sources,
  * including Mailgun. It can intelligently parse 'application/json',
  * 'multipart/form-data', and 'text/plain' content types.
+ * It also includes CORS headers to allow requests from any browser.
  */
+
+// Define CORS headers that will be used in multiple responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Handle OPTIONS requests for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  // Browsers send an OPTIONS request first to check if the actual request is safe to send.
+  // We respond with the allowed methods and headers.
+  return new NextResponse(null, {
+    status: 204, // No Content
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
@@ -37,7 +56,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Handle unsupported content types
       console.error(`Unsupported Content-Type: ${contentType}`);
-      return NextResponse.json({ message: `Unsupported Content-Type` }, { status: 415 });
+      return NextResponse.json({ message: `Unsupported Content-Type` }, { status: 415, headers: corsHeaders });
     }
 
     // Log the parsed data to the Vercel console for debugging
@@ -49,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (!sender || !subject || !body) {
       console.error("Webhook payload was missing required fields after parsing.");
-      return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ message: "Missing required fields" }, { status: 400, headers: corsHeaders });
     }
 
     // --- YOUR VERIFICATION LOGIC WILL GO HERE ---
@@ -57,12 +76,12 @@ export async function POST(request: NextRequest) {
     // query your database, and send the confirmation email.
 
 
-    // Respond with a success message
-    return NextResponse.json({ message: "Webhook processed successfully" }, { status: 200 });
+    // Respond with a success message, including the CORS headers
+    return NextResponse.json({ message: "Webhook processed successfully" }, { status: 200, headers: corsHeaders });
 
   } catch (error) {
     console.error("Error processing webhook:", error);
     // This will catch any errors during parsing
-    return NextResponse.json({ message: "Error processing request" }, { status: 500 });
+    return NextResponse.json({ message: "Error processing request" }, { status: 500, headers: corsHeaders });
   }
 }
